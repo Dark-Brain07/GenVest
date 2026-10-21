@@ -6,11 +6,15 @@ This document provides cryptographic proof and on-chain receipts for the deploym
 
 ## 1. On-Chain Summary Table
 
-| Transaction Purpose | Transaction Hash | Explorer Link | Status |
-| :--- | :--- | :--- | :--- |
-| **Contract Deployment** | `0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7` | [View Deployment Tx](https://explorer-studio.genlayer.com/tx/0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7) | `FINALIZED` |
-| **Flagship Product (`P-000001`)** | `0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf` | [View Product Tx](https://explorer-studio.genlayer.com/tx/0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf) | `FINALIZED` |
-| **Reserve Funding (0.20 GEN)** | `0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8` | [View Funding Tx](https://explorer-studio.genlayer.com/tx/0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8) | `FINALIZED` |
+| Transaction Purpose | Transaction Hash | Explorer Link | Execution Source | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Contract Deployment** | `0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7` | [View Deployment Tx](https://explorer-studio.genlayer.com/tx/0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7) | GenLayer Py SDK | `FINALIZED` |
+| **Flagship Product (`P-000001`)** | `0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf` | [View Product Tx](https://explorer-studio.genlayer.com/tx/0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf) | GenLayer Py SDK | `FINALIZED` |
+| **Reserve Funding (`P-000001`)** | `0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8` | [View Funding Tx](https://explorer-studio.genlayer.com/tx/0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8) | GenLayer Py SDK | `FINALIZED` |
+| **Product Creation (`P-000002`)** | `0x07227e7c00c19f3edcd20ecc0a80989e03b357bef46d4e0024f8c1064268dbbb` | [View Product Tx](https://explorer-studio.genlayer.com/tx/0x07227e7c00c19f3edcd20ecc0a80989e03b357bef46d4e0024f8c1064268dbbb) | GenLayer JS Client | `FINALIZED` |
+| **Reserve Funding (`P-000002`)** | `0xb57078dba9891d97b086a7074c32a2c3c42e349c3dc79d65d0bca92d9dfee722` | [View Funding Tx](https://explorer-studio.genlayer.com/tx/0xb57078dba9891d97b086a7074c32a2c3c42e349c3dc79d65d0bca92d9dfee722) | GenLayer JS Client | `FINALIZED` |
+| **Policy Underwriting (`POL-000001`)** | `0x2db24a38acce9c14e9cb438cbdb1d47a0ce4dd13f97f53c5ff46fb1e8229a1e9` | [View Policy Tx](https://explorer-studio.genlayer.com/tx/0x2db24a38acce9c14e9cb438cbdb1d47a0ce4dd13f97f53c5ff46fb1e8229a1e9) | GenLayer JS Client | `FINALIZED` |
+| **Live Frontend Product (`P-000003`)** | `0x1a12a5e097ddd838068f1979752ed536c618feb2ad14ba82aea41253a64aeba9` | [View Frontend Tx](https://explorer-studio.genlayer.com/tx/0x1a12a5e097ddd838068f1979752ed536c618feb2ad14ba82aea41253a64aeba9) | **Vercel dApp UI (`genvest.vercel.app`)** | `FINALIZED` |
 
 ---
 

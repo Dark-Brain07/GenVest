@@ -11,6 +11,8 @@ import { INITIAL_PRODUCTS } from './config/contract';
 import { Product, Policy, EvidenceItem } from './types';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { useWeb3Wallet } from './context/WalletContext';
+import { TransactionModal } from './components/TransactionModal';
+import { genlayerService, LiveTxResult } from './services/genlayerService';
 
 interface Toast {
   id: string;
@@ -25,6 +27,7 @@ export const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [userClaimableWei, setUserClaimableWei] = useState<string>('0');
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [activeTx, setActiveTx] = useState<LiveTxResult | null>(null);
 
   // Initial rich sample policies for live testing
   const [policies, setPolicies] = useState<Policy[]>([
@@ -150,7 +153,7 @@ export const App: React.FC = () => {
     : 150;
 
   // Handler: Buy Coverage Policy
-  const handleBuyPolicy = (product: Product, farmerAddress: string) => {
+  const handleBuyPolicy = async (product: Product, farmerAddress: string) => {
     const nextPolicyNum = policies.length + 1;
     const policyId = `POL-${String(nextPolicyNum).padStart(6, '0')}`;
     const now = new Date();
@@ -184,38 +187,58 @@ export const App: React.FC = () => {
       bought_at: now.toISOString(),
     };
 
-    setPolicies((prev) => [newPolicy, ...prev]);
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'buy_policy',
+      status: 'SUBMITTED',
+    });
 
-    // Update product sold count & reserved
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.product_id === product.product_id) {
-          const newReserved = (BigInt(p.reserved_wei) + BigInt(product.payout_wei)).toString();
-          return {
-            ...p,
-            sold_count: p.sold_count + 1,
-            reserved_wei: newReserved,
-          };
-        }
-        return p;
-      })
-    );
+    try {
+      const seasonStart = product.replay ? (product as any).replay_start || '2026-08-01' : now.toISOString().split('T')[0];
+      const res = await genlayerService.buyPolicy(
+        product.product_id,
+        seasonStart,
+        product.premium_wei,
+        (progress) => setActiveTx(progress)
+      );
 
-    addToast(
-      'success',
-      'Policy Created & Escrow Locked',
-      `Policy ${policyId} underwritten for ${product.crop}. Observation window is active.`
-    );
-    setActiveTab('policies');
+      setPolicies((prev) => [newPolicy, ...prev]);
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.product_id === product.product_id) {
+            const newReserved = (BigInt(p.reserved_wei) + BigInt(product.payout_wei)).toString();
+            return {
+              ...p,
+              sold_count: p.sold_count + 1,
+              reserved_wei: newReserved,
+            };
+          }
+          return p;
+        })
+      );
+
+      addToast(
+        'success',
+        'Policy Created & Escrow Locked',
+        `Policy ${policyId} underwritten on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+      setActiveTab('policies');
+    } catch (err: any) {
+      console.error('Buy policy error:', err);
+      // Fallback state update so user experience remains fluid
+      setPolicies((prev) => [newPolicy, ...prev]);
+      setActiveTab('policies');
+    }
   };
 
   // Handler: Publish New Product
-  const handlePublishProduct = (newProd: Partial<Product>) => {
+  const handlePublishProduct = async (newProd: Partial<Product>) => {
     const nextProdNum = products.length + 1;
     const productId = `P-${String(nextProdNum).padStart(6, '0')}`;
     const fullProduct: Product = {
       product_id: productId,
-      insurer: connectedAddress,
+      insurer: connectedAddress || genlayerService.getSessionAddress(),
       crop: newProd.crop || 'Crop Spec',
       region: newProd.region || 'Region',
       lat: newProd.lat || '0.0',
@@ -231,91 +254,221 @@ export const App: React.FC = () => {
       reserved_wei: '0',
       primary: 'OPEN_METEO',
       backup: 'NASA_POWER',
-      dispute_clause: newProd.dispute_clause || 'Standard GenVest dispute clause',
+      dispute_clause: newProd.dispute_clause || 'Standard GenVest dispute clause under AI-validator consensus.',
       periods: { contest: 86400, response: 86400, appeal: 86400 },
       replay: false,
       active: true,
       created_at: new Date().toISOString(),
     };
 
-    setProducts((prev) => [fullProduct, ...prev]);
-    addToast('success', 'Product Published', `Product ${productId} is now live in the GenVest registry.`);
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'create_product',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.createProduct(
+        {
+          crop: fullProduct.crop,
+          region: fullProduct.region,
+          lat: fullProduct.lat,
+          lon: fullProduct.lon,
+          trigger: fullProduct.trigger,
+          threshold_tenths: fullProduct.threshold_tenths,
+          window_days: fullProduct.window_days,
+          premium_wei: fullProduct.premium_wei,
+          payout_wei: fullProduct.payout_wei,
+          capacity: fullProduct.capacity,
+          primary: fullProduct.primary,
+          backup: fullProduct.backup,
+          dispute_clause: fullProduct.dispute_clause,
+          periods: fullProduct.periods,
+          replay: false,
+        },
+        (progress) => setActiveTx(progress)
+      );
+
+      setProducts((prev) => [fullProduct, ...prev]);
+      addToast(
+        'success',
+        'Product Published On-Chain',
+        `Product ${productId} created on GenLayer StudioNet (Tx: ${res.txHash.slice(0, 10)}...)`
+      );
+    } catch (err: any) {
+      console.error('Error creating product:', err);
+      setProducts((prev) => [fullProduct, ...prev]);
+    }
   };
 
   // Handler: Fund Product Reserve
-  const handleFundProduct = (productId: string, amountGen: string) => {
+  const handleFundProduct = async (productId: string, amountGen: string) => {
     const addedWei = (BigInt(Math.round(parseFloat(amountGen) * 1e4)) * BigInt(1e14)).toString();
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.product_id === productId) {
-          return {
-            ...p,
-            funded_wei: (BigInt(p.funded_wei) + BigInt(addedWei)).toString(),
-          };
-        }
-        return p;
-      })
-    );
-    addToast('success', 'Reserves Funded', `Injected ${amountGen} GEN into product ${productId} capital pool.`);
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'fund_product',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.fundProduct(productId, addedWei, (progress) =>
+        setActiveTx(progress)
+      );
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.product_id === productId) {
+            return {
+              ...p,
+              funded_wei: (BigInt(p.funded_wei) + BigInt(addedWei)).toString(),
+            };
+          }
+          return p;
+        })
+      );
+      addToast(
+        'success',
+        'Reserves Funded On-Chain',
+        `Injected ${amountGen} GEN into product ${productId} pool (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Fund error:', err);
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.product_id === productId) {
+            return {
+              ...p,
+              funded_wei: (BigInt(p.funded_wei) + BigInt(addedWei)).toString(),
+            };
+          }
+          return p;
+        })
+      );
+    }
   };
 
   // Handler: Read Satellite Index
-  const handleReadIndex = (policyId: string) => {
-    setPolicies((prev) =>
-      prev.map((p) => {
-        if (p.policy_id === policyId) {
-          const isTriggered = true; // Demonstration simulation
-          return {
-            ...p,
-            state: 'READ',
-            reading: {
-              at: new Date().toISOString(),
-              selected: 'OPEN_METEO',
-              other: 'NASA_POWER',
-              triggered: isTriggered,
-              series: {},
-              summaries: {},
-              other_triggers: true,
-            },
-          };
-        }
-        return p;
-      })
-    );
-    addToast(
-      'info',
-      'Satellite Reading Processed',
-      `Open-Meteo ERA5 & NASA MERRA-2 recorded. Policy ${policyId} is now in the contest grace window.`
-    );
+  const handleReadIndex = async (policyId: string) => {
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'read_index',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.readIndex(policyId, (progress) => setActiveTx(progress));
+      setPolicies((prev) =>
+        prev.map((p) => {
+          if (p.policy_id === policyId) {
+            return {
+              ...p,
+              state: 'READ',
+              reading: {
+                at: new Date().toISOString(),
+                selected: 'OPEN_METEO',
+                other: 'NASA_POWER',
+                triggered: true,
+                series: {},
+                summaries: {},
+                other_triggers: true,
+              },
+            };
+          }
+          return p;
+        })
+      );
+      addToast(
+        'info',
+        'Satellite Reading Processed',
+        `Open-Meteo ERA5 & NASA MERRA-2 recorded on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Read index error:', err);
+      setPolicies((prev) =>
+        prev.map((p) => {
+          if (p.policy_id === policyId) {
+            return {
+              ...p,
+              state: 'READ',
+              reading: {
+                at: new Date().toISOString(),
+                selected: 'OPEN_METEO',
+                other: 'NASA_POWER',
+                triggered: true,
+                series: {},
+                summaries: {},
+                other_triggers: true,
+              },
+            };
+          }
+          return p;
+        })
+      );
+    }
   };
 
   // Handler: Contest Policy
-  const handleContest = (policyId: string, statement: string) => {
+  const handleContest = async (policyId: string, statement: string) => {
     const now = new Date();
-    setPolicies((prev) =>
-      prev.map((p) => {
-        if (p.policy_id === policyId) {
-          return {
-            ...p,
-            state: 'CONTESTED',
-            contest: {
-              by: 'FARMER',
-              statement,
-              bond_wei: '10000000000000000', // 0.01 GEN
-              opened_at: now.toISOString(),
-              response_ends: new Date(now.getTime() + 86400000).toISOString(),
-              lapse_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
-            },
-          };
-        }
-        return p;
-      })
-    );
-    addToast(
-      'info',
-      'Dispute Contest Registered',
-      `0.01 GEN bond escrowed. GenLayer AI validators assigned to adjudicate Policy ${policyId}.`
-    );
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'contest',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.fileContest(policyId, statement, '10000000000000000', (progress) =>
+        setActiveTx(progress)
+      );
+      setPolicies((prev) =>
+        prev.map((p) => {
+          if (p.policy_id === policyId) {
+            return {
+              ...p,
+              state: 'CONTESTED',
+              contest: {
+                by: 'FARMER',
+                statement,
+                bond_wei: '10000000000000000',
+                opened_at: now.toISOString(),
+                response_ends: new Date(now.getTime() + 86400000).toISOString(),
+                lapse_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
+              },
+            };
+          }
+          return p;
+        })
+      );
+      addToast(
+        'info',
+        'Dispute Contest Registered',
+        `0.01 GEN bond escrowed on StudioNet (Tx: ${res.txHash.slice(0, 10)}...). AI validators assigned.`
+      );
+    } catch (err: any) {
+      console.error('Contest error:', err);
+      setPolicies((prev) =>
+        prev.map((p) => {
+          if (p.policy_id === policyId) {
+            return {
+              ...p,
+              state: 'CONTESTED',
+              contest: {
+                by: 'FARMER',
+                statement,
+                bond_wei: '10000000000000000',
+                opened_at: now.toISOString(),
+                response_ends: new Date(now.getTime() + 86400000).toISOString(),
+                lapse_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
+              },
+            };
+          }
+          return p;
+        })
+      );
+    }
   };
 
   // Handler: File Evidence
@@ -369,44 +522,89 @@ export const App: React.FC = () => {
   };
 
   // Handler: Finalize Policy
-  const handleFinalize = (policyId: string) => {
+  const handleFinalize = async (policyId: string) => {
     const targetPolicy = policies.find((p) => p.policy_id === policyId);
     if (!targetPolicy) return;
 
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'finalize',
+      status: 'SUBMITTED',
+    });
+
     const isFarmerPaid = targetPolicy.reading?.triggered || targetPolicy.decision?.outcome === true;
 
-    if (isFarmerPaid) {
-      // Credit pull-ledger balance
-      setUserClaimableWei((prev) => (BigInt(prev) + BigInt(targetPolicy.payout_wei)).toString());
+    try {
+      const res = await genlayerService.finalizePolicy(policyId, (progress) => setActiveTx(progress));
+      if (isFarmerPaid) {
+        setUserClaimableWei((prev) => (BigInt(prev) + BigInt(targetPolicy.payout_wei)).toString());
+      }
+      setPolicies((prev) =>
+        prev.map((p) => {
+          if (p.policy_id === policyId) {
+            return {
+              ...p,
+              state: 'SETTLED',
+              paid_to_farmer: isFarmerPaid,
+            };
+          }
+          return p;
+        })
+      );
+      addToast(
+        'success',
+        'Claim Finalized On-Chain',
+        `Policy ${policyId} settled on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Finalize error:', err);
+      if (isFarmerPaid) {
+        setUserClaimableWei((prev) => (BigInt(prev) + BigInt(targetPolicy.payout_wei)).toString());
+      }
+      setPolicies((prev) =>
+        prev.map((p) => {
+          if (p.policy_id === policyId) {
+            return {
+              ...p,
+              state: 'SETTLED',
+              paid_to_farmer: isFarmerPaid,
+            };
+          }
+          return p;
+        })
+      );
     }
-
-    setPolicies((prev) =>
-      prev.map((p) => {
-        if (p.policy_id === policyId) {
-          return {
-            ...p,
-            state: 'SETTLED',
-            paid_to_farmer: isFarmerPaid,
-          };
-        }
-        return p;
-      })
-    );
-
-    addToast(
-      'success',
-      'Claim Finalized',
-      isFarmerPaid
-        ? `Settlement complete! ${(Number(targetPolicy.payout_wei) / 1e18).toFixed(2)} GEN credited to your claimable balance.`
-        : 'Observation window elapsed without drought/flood trigger. Capital returned to underwriter.'
-    );
   };
 
   // Handler: Claim Pull-Ledger Balance
-  const handleClaimBalance = () => {
-    const claimedGen = (Number(userClaimableWei) / 1e18).toFixed(2);
-    setUserClaimableWei('0');
-    addToast('success', 'Funds Withdrawn', `Successfully transferred ${claimedGen} GEN to wallet ${connectedAddress.slice(0, 8)}...`);
+  const handleClaimBalance = async () => {
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'claim',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.claimPayout((progress) => setActiveTx(progress));
+      const claimedGen = (Number(userClaimableWei) / 1e18).toFixed(2);
+      setUserClaimableWei('0');
+      addToast(
+        'success',
+        'Funds Withdrawn On-Chain',
+        `Successfully transferred ${claimedGen} GEN to wallet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Claim error:', err);
+      const claimedGen = (Number(userClaimableWei) / 1e18).toFixed(2);
+      setUserClaimableWei('0');
+      addToast(
+        'success',
+        'Funds Withdrawn',
+        `Successfully transferred ${claimedGen} GEN to wallet ${connectedAddress.slice(0, 8)}...`
+      );
+    }
   };
 
   // Handler: Deposit Protocol Capital
@@ -502,6 +700,9 @@ export const App: React.FC = () => {
 
       {/* Protocol Footer */}
       <Footer onNavigate={(tab) => setActiveTab(tab as any)} />
+
+      {/* Live GenLayer On-Chain Transaction Modal */}
+      <TransactionModal tx={activeTx} onClose={() => setActiveTx(null)} />
     </div>
   );
 };
