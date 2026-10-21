@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Coins, Wallet, CheckCircle2, Menu, X } from 'lucide-react';
+import { Coins, Wallet, CheckCircle2, Menu, X } from 'lucide-react';
 import { useWeb3Wallet } from '../context/WalletContext';
 import { WalletModal } from './WalletModal';
 
@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="navbar-brand"
           >
             <div className="brand-logo-glow">
-              <ShieldCheck size={22} color="#ffffff" strokeWidth={2.4} />
+              <img src="/logo.png" alt="GenVest Logo" className="brand-logo-img" />
             </div>
             <div className="brand-text-col">
               <div className="brand-title-row">

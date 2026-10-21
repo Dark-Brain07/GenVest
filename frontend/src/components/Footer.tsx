@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { CONTRACT_CONFIG } from '../config/contract';
 
 interface FooterProps {
@@ -15,7 +15,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className="footer-brand-col">
             <div className="footer-logo-row">
               <div className="footer-logo-icon">
-                <ShieldCheck size={24} className="text-emerald" />
+                <img src="/logo.png" alt="GenVest Logo" className="footer-logo-img" />
               </div>
               <span className="footer-brand-name">GenVest</span>
             </div>
