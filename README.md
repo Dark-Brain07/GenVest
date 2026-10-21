@@ -177,4 +177,5 @@ Open `http://localhost:5173` in your browser. The application features:
 ## Author & Contributor
 
 - **Sole Developer & Contributor**: [Dark-Brain07](https://github.com/Dark-Brain07)
+- **GitHub Repository**: [https://github.com/Dark-Brain07/GenVest](https://github.com/Dark-Brain07/GenVest)
 - **Built for**: GenLayer Intelligent Contract Hackathon
