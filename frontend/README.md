@@ -2,6 +2,9 @@
 
 The **GenVest** web application is a high-performance, dark-themed decentralized application built using React 18, TypeScript, Vite, and custom cyber-nature Vanilla CSS. It provides an intuitive interface for interacting with the GenVest Intelligent Contract on GenLayer StudioNet.
 
+- **Live Production URL**: [https://genvest.vercel.app](https://genvest.vercel.app)
+- **GenLayer StudioNet Contract**: [`0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf`](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf)
+
 ---
 
 ## Key Features

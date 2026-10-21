@@ -1,5 +1,6 @@
 # GenVest — Autonomous Climate & Crop Yield Hedging Protocol
 
+[![Live DApp](https://img.shields.io/badge/Live_DApp-genvest.vercel.app-000000?style=for-the-badge&logo=vercel)](https://genvest.vercel.app)
 [![GenLayer StudioNet](https://img.shields.io/badge/GenLayer-StudioNet_61999-10b981?style=for-the-badge&logo=ethereum)](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf)
 [![Intelligent Contract](https://img.shields.io/badge/GenVM-Intelligent_Contract-06b6d4?style=for-the-badge&logo=python)](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf)
 [![Direct Tests](https://img.shields.io/badge/pytest-16_passed-success?style=for-the-badge)](tests/test_direct_genvest.py)
@@ -13,12 +14,13 @@
 
 ---
 
-## Live On-Chain Deployment (StudioNet)
+## Live Deployment (StudioNet & Vercel)
 
-The GenVest Intelligent Contract is active and finalized on GenLayer StudioNet:
+The GenVest protocol and web application are fully deployed and live:
 
 | Property | Value |
 | :--- | :--- |
+| **Live Web DApp** | [`https://genvest.vercel.app`](https://genvest.vercel.app) |
 | **Contract Name** | `GenVest` |
 | **Deployed Address** | [`0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf`](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf) |
 | **Deployment Transaction** | [`0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7`](https://explorer-studio.genlayer.com/tx/0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7) |

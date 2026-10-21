@@ -17,6 +17,7 @@ This document provides cryptographic proof and on-chain receipts for the deploym
 ## 2. Deployed Contract Specifications
 
 - **Contract Name**: `GenVest`
+- **Live Web Application (Vercel)**: [`https://genvest.vercel.app`](https://genvest.vercel.app)
 - **Contract Address**: [`0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf`](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf)
 - **Deployer Wallet**: `0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5`
 - **Network Name**: `GenLayer StudioNet`
