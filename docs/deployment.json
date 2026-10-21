@@ -1,0 +1,16 @@
+{
+  "network": "studionet",
+  "chain_id": 61999,
+  "contract_name": "GenVest",
+  "contract_address": "0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf",
+  "deploy_tx_hash": "0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7",
+  "deployer_address": "0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5",
+  "explorer_contract_url": "https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf",
+  "explorer_tx_url": "https://explorer-studio.genlayer.com/tx/0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7",
+  "flagship_product_id": "P-000001",
+  "create_product_tx_hash": "0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf",
+  "create_product_tx_url": "https://explorer-studio.genlayer.com/tx/0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf",
+  "fund_product_tx_hash": "0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8",
+  "fund_product_tx_url": "https://explorer-studio.genlayer.com/tx/0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8",
+  "timestamp": "2026-10-21T03:44:10Z"
+}
