@@ -10,6 +10,7 @@ import { Footer } from './components/Footer';
 import { INITIAL_PRODUCTS } from './config/contract';
 import { Product, Policy, EvidenceItem } from './types';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { useWeb3Wallet } from './context/WalletContext';
 
 interface Toast {
   id: string;
@@ -20,7 +21,7 @@ interface Toast {
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'products' | 'oracle' | 'policies' | 'pool' | 'contract'>('products');
-  const [connectedAddress, setConnectedAddress] = useState<string>('0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5');
+  const { address: connectedAddress } = useWeb3Wallet();
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [userClaimableWei, setUserClaimableWei] = useState<string>('0');
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -439,8 +440,6 @@ export const App: React.FC = () => {
       <Navbar
         activeTab={activeTab}
         onSelectTab={(tab: any) => setActiveTab(tab)}
-        connectedAddress={connectedAddress}
-        onSwitchAddress={(addr: string) => setConnectedAddress(addr)}
         claimableWei={userClaimableWei}
         onClaim={handleClaimBalance}
       />
