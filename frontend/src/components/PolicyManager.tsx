@@ -9,7 +9,10 @@ import {
   ChevronDown, 
   ChevronUp, 
   MapPin, 
-  DollarSign 
+  DollarSign,
+  MessageSquare,
+  ShieldAlert,
+  Gavel
 } from 'lucide-react';
 import { Policy, EvidenceItem } from '../types';
 import { DisputeDeliberationModal } from './DisputeDeliberationModal';
@@ -19,8 +22,11 @@ interface PolicyManagerProps {
   evidenceItems: EvidenceItem[];
   onReadIndex: (policyId: string) => void;
   onContest: (policyId: string, statement: string) => void;
+  onAnswer: (policyId: string, statement: string) => void;
   onFileEvidence: (policyId: string, kind: 'PHOTO' | 'PAGE', caption: string, url: string) => void;
   onDecideDispute: (policyId: string) => void;
+  onAppeal: (policyId: string, statement: string) => void;
+  onDecideAppeal: (policyId: string) => void;
   onFinalize: (policyId: string) => void;
   onClaimBalance: () => void;
   userClaimableWei: string;
@@ -32,8 +38,11 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
   evidenceItems,
   onReadIndex,
   onContest,
+  onAnswer,
   onFileEvidence,
   onDecideDispute,
+  onAppeal,
+  onDecideAppeal,
   onFinalize,
   onClaimBalance,
   userClaimableWei,
@@ -41,12 +50,22 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
 }) => {
   const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'READ' | 'CONTESTED' | 'SETTLED'>('ALL');
   const [selectedPolicyForDeliberation, setSelectedPolicyForDeliberation] = useState<Policy | null>(null);
+  
+  // Modals state
   const [contestModalPolicy, setContestModalPolicy] = useState<Policy | null>(null);
   const [contestStatement, setContestStatement] = useState('');
+  
+  const [answerModalPolicy, setAnswerModalPolicy] = useState<Policy | null>(null);
+  const [answerStatement, setAnswerStatement] = useState('');
+
+  const [appealModalPolicy, setAppealModalPolicy] = useState<Policy | null>(null);
+  const [appealStatement, setAppealStatement] = useState('');
+
   const [evidenceModalPolicy, setEvidenceModalPolicy] = useState<Policy | null>(null);
-  const [evidenceKind, setEvidenceKind] = useState<'PHOTO' | 'PAGE'>('PHOTO');
+  const [evidenceKind, setEvidenceKind] = useState<'PHOTO' | 'PAGE'>('PAGE');
   const [evidenceCaption, setEvidenceCaption] = useState('');
   const [evidenceUrl, setEvidenceUrl] = useState('');
+
   const [expandedPolicyId, setExpandedPolicyId] = useState<string | null>(null);
 
   const formatGen = (weiStr: string): string => {
@@ -75,6 +94,22 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
     setContestStatement('');
   };
 
+  const handleAnswerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!answerModalPolicy || !answerStatement) return;
+    onAnswer(answerModalPolicy.policy_id, answerStatement);
+    setAnswerModalPolicy(null);
+    setAnswerStatement('');
+  };
+
+  const handleAppealSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!appealModalPolicy || !appealStatement) return;
+    onAppeal(appealModalPolicy.policy_id, appealStatement);
+    setAppealModalPolicy(null);
+    setAppealStatement('');
+  };
+
   const handleEvidenceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!evidenceModalPolicy || !evidenceCaption) return;
@@ -91,10 +126,10 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
       <div className="section-header-row">
         <div>
           <span className="section-kicker text-emerald">Portfolio & Claim Operations</span>
-          <h2 className="section-title">My Parametric Policies</h2>
+          <h2 className="section-title">Parametric Yield Policies</h2>
           <p className="section-subtitle">
-            Track policy observation periods, execute satellite settlement checks, file photographic disputes, and claim payouts.
-            {' '}<span className="text-muted">(Connected as <code>{connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)}</code>)</span>
+            Track policy observation periods, execute satellite settlement checks, file evidence, and claim payouts.
+            {' '}<span className="text-muted">(Connected as <code>{connectedAddress ? `${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}` : 'Disconnected'}</code>)</span>
           </p>
         </div>
 
@@ -143,13 +178,13 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
             className={`filter-tab ${filter === 'CONTESTED' ? 'active' : ''}`}
             onClick={() => setFilter('CONTESTED')}
           >
-            In Dispute ({policies.filter(p => p.state === 'CONTESTED' || p.state === 'APPEALED').length})
+            In Dispute / Appeal ({policies.filter(p => p.state === 'CONTESTED' || p.state === 'APPEALED').length})
           </button>
           <button 
             className={`filter-tab ${filter === 'SETTLED' ? 'active' : ''}`}
             onClick={() => setFilter('SETTLED')}
           >
-            Settled ({policies.filter(p => p.state === 'SETTLED').length})
+            Settled Claims ({policies.filter(p => p.state === 'SETTLED').length})
           </button>
         </div>
       </div>
@@ -157,96 +192,52 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
       {/* Policies List */}
       <div className="policies-list">
         {filteredPolicies.length === 0 ? (
-          <div className="empty-state-panel glass-panel">
-            <FileCheck size={48} className="text-muted" />
+          <div className="empty-state-card glass-panel text-center">
+            <FileCheck size={40} className="text-muted" style={{ margin: '0 auto 12px' }} />
             <h3>No Policies Found</h3>
-            <p className="text-muted">You do not have any policies matching the selected filter criteria.</p>
+            <p className="text-muted">
+              You haven't underwritten or purchased policies in this category yet. Browse the catalog to protect crops with smart contracts.
+            </p>
           </div>
         ) : (
           filteredPolicies.map((policy) => {
             const isExpanded = expandedPolicyId === policy.policy_id;
-            const thresholdMm = (policy.threshold_tenths / 10).toFixed(1);
             const payoutGen = formatGen(policy.payout_wei);
             const premiumGen = formatGen(policy.premium_wei);
-            const relatedEvidence = evidenceItems.filter(e => e.policy_id === policy.policy_id);
+            const relatedEvidence = evidenceItems.filter((e) => e.policy_id === policy.policy_id);
 
             return (
-              <div key={policy.policy_id} className="policy-item-card glass-panel">
-                {/* Header Row */}
-                <div className="policy-item-header">
-                  <div className="policy-id-crop">
-                    <span className="policy-id-badge">{policy.policy_id}</span>
+              <div key={policy.policy_id} className={`policy-card glass-panel state-${policy.state.toLowerCase()}`}>
+                {/* Policy Header */}
+                <div className="policy-header-row">
+                  <div className="policy-main-info">
+                    <span className="policy-id-badge"><code>{policy.policy_id}</code></span>
                     <h3 className="policy-crop-title">{policy.crop}</h3>
-                    <div className="policy-loc-tag">
-                      <MapPin size={13} className="text-muted" />
+                    <div className="policy-location-chip">
+                      <MapPin size={13} />
                       <span>{policy.region}</span>
                     </div>
                   </div>
 
-                  <div className="policy-state-badge-wrap">
-                    <span className={`state-badge state-${policy.state.toLowerCase()}`}>
+                  <div className="policy-header-meta">
+                    <div className="policy-payout-box">
+                      <span className="meta-label">Coverage (Premium)</span>
+                      <span className="meta-val text-emerald">{payoutGen} GEN <small style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>({premiumGen} GEN)</small></span>
+                    </div>
+                    <div className={`policy-state-badge state-badge-${policy.state.toLowerCase()}`}>
                       {policy.state}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Lifecycle Progress Bar */}
-                <div className="lifecycle-track-wrap">
-                  <div className="lifecycle-steps">
-                    <div className={`lifecycle-step ${['ACTIVE', 'READ', 'CONTESTED', 'DECIDED', 'SETTLED'].includes(policy.state) ? 'done' : ''}`}>
-                      <div className="step-circle">1</div>
-                      <span>Active Coverage</span>
-                    </div>
-                    <div className="step-connector"></div>
-                    <div className={`lifecycle-step ${['READ', 'CONTESTED', 'DECIDED', 'SETTLED'].includes(policy.state) ? 'done' : ''}`}>
-                      <div className="step-circle">2</div>
-                      <span>Oracle Read</span>
-                    </div>
-                    <div className="step-connector"></div>
-                    <div className={`lifecycle-step ${['CONTESTED', 'DECIDED'].includes(policy.state) ? 'in-dispute' : policy.state === 'SETTLED' ? 'done' : ''}`}>
-                      <div className="step-circle">3</div>
-                      <span>Dispute Window</span>
-                    </div>
-                    <div className="step-connector"></div>
-                    <div className={`lifecycle-step ${policy.state === 'SETTLED' ? 'done' : ''}`}>
-                      <div className="step-circle">4</div>
-                      <span>Final Settlement</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Key Metrics Row */}
-                <div className="policy-metrics-row">
-                  <div className="metric-cell">
-                    <span className="metric-label">Trigger Condition</span>
-                    <span className="metric-val">Rain {policy.trigger === 'RAIN_BELOW' ? '<' : '>'} <strong>{thresholdMm} mm</strong></span>
-                  </div>
-                  <div className="metric-cell">
-                    <span className="metric-label">Window Duration</span>
-                    <span className="metric-val">{policy.window_days} Days ({policy.window_start.slice(0, 10)} to {policy.window_end.slice(0, 10)})</span>
-                  </div>
-                  <div className="metric-cell">
-                    <span className="metric-label">Guaranteed Payout</span>
-                    <span className="metric-val text-cyan">{payoutGen} GEN</span>
-                  </div>
-                  <div className="metric-cell">
-                    <span className="metric-label">Premium Paid</span>
-                    <span className="metric-val text-emerald">{premiumGen} GEN</span>
-                  </div>
-                  <div className="metric-cell">
-                    <span className="metric-label">Beneficiary</span>
-                    <span className="metric-val"><code>{policy.farmer.slice(0, 8)}...{policy.farmer.slice(-6)}</code></span>
-                  </div>
-                </div>
-
-                {/* Oracle Reading Banner (if READ or beyond) */}
+                {/* Satellite Reading Status Banner (if READ) */}
                 {policy.reading && (
-                  <div className="oracle-reading-banner">
+                  <div className={`satellite-reading-banner ${policy.reading.triggered ? 'triggered' : 'normal'}`}>
                     <div className="reading-icon-wrap">
-                      <Satellite size={18} className="text-cyan" />
+                      <Satellite size={18} />
                     </div>
-                    <div className="reading-info">
-                      <span className="reading-title">Dual-Satellite Observation Recorded:</span>
+                    <div className="reading-text-wrap">
+                      <span className="reading-heading">Dual Satellite Consensus Cross-Check:</span>
                       <span className="reading-details">
                         {policy.reading.selected} recorded <strong>{policy.reading.triggered ? 'TRIGGERED' : 'NORMAL'}</strong> rainfall. 
                         Cross-check ({policy.reading.other}): <strong>{policy.reading.other_triggers ? 'TRIGGERED' : 'NORMAL'}</strong>.
@@ -258,25 +249,25 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                   </div>
                 )}
 
-                {/* Dispute Status Banner (if CONTESTED or DECIDED) */}
+                {/* Dispute Status Banner (if CONTESTED or DECIDED or APPEALED) */}
                 {policy.contest && (
                   <div className="dispute-status-banner">
                     <div className="dispute-icon-wrap">
                       <AlertTriangle size={18} className="text-amber" />
                     </div>
                     <div className="dispute-info">
-                      <span className="dispute-title">Contest Filed by {policy.contest.by}:</span>
+                      <span className="dispute-title">Contest Ground ({policy.contest.by}):</span>
                       <span className="dispute-statement">"{policy.contest.statement}"</span>
                     </div>
                     <div className="dispute-evidence-count">
-                      <span>{relatedEvidence.length} Evidence files attached</span>
+                      <span>{relatedEvidence.length} Evidence logged</span>
                     </div>
                   </div>
                 )}
 
                 {/* Actions Bar */}
                 <div className="policy-actions-bar">
-                  <div className="left-actions">
+                  <div className="left-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {/* State: ACTIVE -> Read Index */}
                     {policy.state === 'ACTIVE' && (
                       <button
@@ -289,7 +280,7 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                       </button>
                     )}
 
-                    {/* State: READ -> Contest Dispute */}
+                    {/* State: READ -> Contest Dispute or Finalize */}
                     {policy.state === 'READ' && (
                       <>
                         <button
@@ -298,7 +289,7 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                           onClick={() => setContestModalPolicy(policy)}
                         >
                           <AlertTriangle size={14} />
-                          <span>File Dispute / Contest (0.01 GEN Stake)</span>
+                          <span>File Dispute Contest (0.01 GEN Stake)</span>
                         </button>
                         <button
                           id={`finalize-btn-${policy.policy_id}`}
@@ -306,13 +297,13 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                           onClick={() => onFinalize(policy.policy_id)}
                         >
                           <CheckCircle2 size={14} />
-                          <span>Finalize Without Contest</span>
+                          <span>Finalize Settlement</span>
                         </button>
                       </>
                     )}
 
-                    {/* State: CONTESTED -> Attach Evidence / View Deliberation */}
-                    {(policy.state === 'CONTESTED' || policy.state === 'APPEALED') && (
+                    {/* State: CONTESTED -> Attach Evidence / File Answer / Adjudicate */}
+                    {policy.state === 'CONTESTED' && (
                       <>
                         <button
                           id={`attach-evidence-btn-${policy.policy_id}`}
@@ -323,25 +314,55 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                           <span>Submit Geotagged Evidence</span>
                         </button>
                         <button
-                          id={`view-deliberation-btn-${policy.policy_id}`}
+                          id={`file-answer-btn-${policy.policy_id}`}
                           className="btn btn-outline btn-sm"
+                          onClick={() => setAnswerModalPolicy(policy)}
+                        >
+                          <MessageSquare size={14} />
+                          <span>File Response Statement</span>
+                        </button>
+                        <button
+                          id={`view-deliberation-btn-${policy.policy_id}`}
+                          className="btn btn-primary btn-sm"
                           onClick={() => setSelectedPolicyForDeliberation(policy)}
                         >
-                          <Scale size={14} className="text-purple" />
-                          <span>Inspect AI-Validator Deliberation</span>
+                          <Scale size={14} />
+                          <span>Execute AI Consensus Verdict</span>
                         </button>
                       </>
                     )}
 
-                    {/* State: DECIDED -> Finalize Claim */}
+                    {/* State: DECIDED -> Finalize Claim or File Escalation Appeal */}
                     {policy.state === 'DECIDED' && (
+                      <>
+                        <button
+                          id={`finalize-decided-btn-${policy.policy_id}`}
+                          className="btn btn-primary btn-sm"
+                          onClick={() => onFinalize(policy.policy_id)}
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Execute Final Claim Settlement</span>
+                        </button>
+                        <button
+                          id={`appeal-btn-${policy.policy_id}`}
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setAppealModalPolicy(policy)}
+                        >
+                          <ShieldAlert size={14} />
+                          <span>File Escalation Appeal (0.01 GEN Bond)</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* State: APPEALED -> Execute Appeal Consensus */}
+                    {policy.state === 'APPEALED' && (
                       <button
-                        id={`finalize-decided-btn-${policy.policy_id}`}
+                        id={`decide-appeal-btn-${policy.policy_id}`}
                         className="btn btn-primary btn-sm"
-                        onClick={() => onFinalize(policy.policy_id)}
+                        onClick={() => onDecideAppeal(policy.policy_id)}
                       >
-                        <CheckCircle2 size={14} />
-                        <span>Execute Final Claim Settlement</span>
+                        <Gavel size={14} />
+                        <span>Execute Appeal Consensus Verdict</span>
                       </button>
                     )}
 
@@ -405,12 +426,12 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
             <form onSubmit={handleContestSubmit}>
               <div className="modal-body">
                 <p className="text-muted">
-                  Under the product's signed dispute clause, you can challenge the satellite reading by posting a <strong>0.01 GEN bond</strong>. 
-                  GenLayer AI validators will review your grounds and evidence under Optimistic Democracy.
+                  Challenge the satellite reading by posting a <strong>0.01 GEN bond</strong>. 
+                  GenLayer AI validators will adjudicate strictly against the bilateral dispute clause signed at policy issuance.
                 </p>
 
                 <div className="form-group">
-                  <label className="form-label">Contest Ground / Statement</label>
+                  <label className="form-label">Contest Grounds / Statement</label>
                   <textarea 
                     className="form-input textarea" 
                     rows={4}
@@ -423,7 +444,7 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
 
                 <div className="bond-notice-box">
                   <DollarSign size={16} className="text-amber" />
-                  <span>Contest Bond: <strong>0.01 GEN</strong> (Returned if contest is upheld by validators).</span>
+                  <span>Contest Bond: <strong>0.01 GEN</strong> (Restituted if contest is upheld by AI consensus).</span>
                 </div>
               </div>
 
@@ -433,6 +454,99 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                 </button>
                 <button id="confirm-contest-submit-btn" type="submit" className="btn btn-secondary">
                   Post Bond & Submit Contest
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Answer / Response Counter-Statement Modal */}
+      {answerModalPolicy && (
+        <div className="modal-backdrop">
+          <div className="modal-dialog glass-panel">
+            <div className="modal-header">
+              <div className="modal-title-wrap">
+                <MessageSquare size={22} className="text-cyan" />
+                <h3>File Counter-Statement for {answerModalPolicy.policy_id}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setAnswerModalPolicy(null)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleAnswerSubmit}>
+              <div className="modal-body">
+                <p className="text-muted">
+                  Submit a formal response counter-statement on-chain to contest allegations before validator consensus deliberation.
+                </p>
+
+                <div className="form-group">
+                  <label className="form-label">Response Statement</label>
+                  <textarea 
+                    className="form-input textarea" 
+                    rows={4}
+                    placeholder="Provide counter-evidence details (e.g. Regional irrigation canals remained operational; ERA5 reanalysis reflects aggregate soil moisture)..."
+                    value={answerStatement}
+                    onChange={(e) => setAnswerStatement(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setAnswerModalPolicy(null)}>
+                  Cancel
+                </button>
+                <button id="confirm-answer-submit-btn" type="submit" className="btn btn-primary">
+                  Commit Response On-Chain
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Appeal Escalation Modal */}
+      {appealModalPolicy && (
+        <div className="modal-backdrop">
+          <div className="modal-dialog glass-panel">
+            <div className="modal-header">
+              <div className="modal-title-wrap">
+                <ShieldAlert size={22} className="text-purple" />
+                <h3>Escalate Appeal for {appealModalPolicy.policy_id}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setAppealModalPolicy(null)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleAppealSubmit}>
+              <div className="modal-body">
+                <p className="text-muted">
+                  Appeal an adverse first-tier decision to the higher-tier consensus committee by posting an <strong>appeal bond (0.01 GEN)</strong>.
+                </p>
+
+                <div className="form-group">
+                  <label className="form-label">Appeal Grounds</label>
+                  <textarea 
+                    className="form-input textarea" 
+                    rows={4}
+                    placeholder="Provide specific legal or factual grounds under the signed dispute clause why the initial ruling should be overturned..."
+                    value={appealStatement}
+                    onChange={(e) => setAppealStatement(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="bond-notice-box">
+                  <DollarSign size={16} className="text-purple" />
+                  <span>Appeal Bond: <strong>0.01 GEN</strong> (Escrowed on StudioNet until final adjudication).</span>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setAppealModalPolicy(null)}>
+                  Cancel
+                </button>
+                <button id="confirm-appeal-submit-btn" type="submit" className="btn btn-primary">
+                  Escalate Appeal On-Chain
                 </button>
               </div>
             </form>
@@ -461,8 +575,8 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                     value={evidenceKind}
                     onChange={(e) => setEvidenceKind(e.target.value as any)}
                   >
-                    <option value="PHOTO">Field Photography (Geotagged Camera / Drone)</option>
                     <option value="PAGE">Official Weather Bulletin / Web Archive URL</option>
+                    <option value="PHOTO">Field Photography (Camera / Drone Snapshot)</option>
                   </select>
                 </div>
 
@@ -471,7 +585,7 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                   <input 
                     type="text" 
                     className="form-input"
-                    placeholder="e.g. Drone orthomosaic of parched maize canopy at Field Sector 4..."
+                    placeholder="e.g. INTA Regional Agrometeorological Bulletin confirming rainfall deficit..."
                     value={evidenceCaption}
                     onChange={(e) => setEvidenceCaption(e.target.value)}
                     required
@@ -479,15 +593,16 @@ export const PolicyManager: React.FC<PolicyManagerProps> = ({
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Media URL / Web Link</label>
+                  <label className="form-label">Source URL / Web Link</label>
                   <input 
                     type="url" 
                     className="form-input"
-                    placeholder="https://ipfs.io/ipfs/... or https://met-agency.gov/bulletin"
+                    placeholder="https://metagency.gov.ng/bulletin-aug-2026 or https://ipfs.io/ipfs/..."
                     value={evidenceUrl}
                     onChange={(e) => setEvidenceUrl(e.target.value)}
+                    required
                   />
-                  <span className="form-hint">GenVM AI validators fetch external URLs to verify timestamp and meteorological facts.</span>
+                  <span className="form-hint">GenVM AI validators fetch external URLs to verify timestamps, rainfall statistics, and facts.</span>
                 </div>
               </div>
 

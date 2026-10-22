@@ -715,11 +715,16 @@ class GenVest(gl.Contract):
         dest = y["farmer"] if role == "FARMER" else y["insurer"]
         self._credit(dest, wei)
 
-    def _release(self, y: dict) -> None:
+    def _release(self, y: dict, paid_out: bool = False) -> None:
         if y["reserved"]:
             y["reserved"] = False
             p = self._product(y["product_id"])
-            p["reserved_wei"] = str(max(0, int(p["reserved_wei"]) - int(y["payout_wei"])))
+            payout = int(y["payout_wei"])
+            p["reserved_wei"] = str(max(0, int(p["reserved_wei"]) - payout))
+            if paid_out:
+                # Deduct payout permanently from product pool so it cannot be withdrawn or reused
+                p["funded_wei"] = str(max(0, int(p["funded_wei"]) - payout))
+                p["paid_out_wei"] = str(int(p.get("paid_out_wei", "0")) + payout)
             self._save_product(p)
 
     def _settle(self, y: dict, how: str, outcome) -> None:
@@ -734,19 +739,19 @@ class GenVest(gl.Contract):
             y["paid_to_farmer"] = True
             self._pay(y, "FARMER", int(y["payout_wei"]))
             self._pay(y, "INSURER", int(y["premium_wei"]))
-            self._release(y)
+            self._release(y, paid_out=True)
             self._bump("paid_out")
             self._bump("paid_wei", int(y["payout_wei"]))
         elif outcome is False:
             # Not triggered: premium to insurer, reserve released
             y["paid_to_farmer"] = False
             self._pay(y, "INSURER", int(y["premium_wei"]))
-            self._release(y)
+            self._release(y, paid_out=False)
         else:
             # Void: refund premium to farmer, release reserve to insurer
             y["paid_to_farmer"] = False
             self._pay(y, "FARMER", int(y["premium_wei"]))
-            self._release(y)
+            self._release(y, paid_out=False)
 
         self._bump("settled")
         self._bump("held_wei", -(int(y["premium_wei"])))
@@ -982,6 +987,7 @@ class GenVest(gl.Contract):
             "sold_count": 0,
             "funded_wei": "0",
             "reserved_wei": "0",
+            "paid_out_wei": "0",
             "primary": primary,
             "backup": backup,
             "dispute_clause": clause,
@@ -997,7 +1003,7 @@ class GenVest(gl.Contract):
         self._push(f"insurer|{insurer_addr}", pid)
         return pid
 
-    @gl.public.write
+    @gl.public.write.payable
     def fund_product(self, product_id: str) -> str:
         """Fund capital reserve for a product (payable via gl.message.value)."""
         p = self._product(product_id)
@@ -1037,7 +1043,7 @@ class GenVest(gl.Contract):
         self._save_product(p)
         return json.dumps({"product_id": product_id, "active": False})
 
-    @gl.public.write
+    @gl.public.write.payable
     def buy_policy(self, product_id: str, season_start_date: str) -> str:
         """Purchase parametric climate hedging policy (payable with exact premium)."""
         p = self._product(product_id)
@@ -1204,7 +1210,7 @@ class GenVest(gl.Contract):
         self._save(y)
         return json.dumps({"policy_id": policy_id, "state": y["state"]})
 
-    @gl.public.write
+    @gl.public.write.payable
     def contest(self, policy_id: str, statement: str) -> str:
         """
         Disadvantaged party contests the reading by posting a bond (payable via gl.message.value).
@@ -1471,7 +1477,7 @@ class GenVest(gl.Contract):
         self._save(y)
         return json.dumps({"policy_id": policy_id, "state": y["state"]})
 
-    @gl.public.write
+    @gl.public.write.payable
     def appeal(self, policy_id: str, statement: str) -> str:
         """Party short of its optimal outcome posts bond to escalate to second-tier review."""
         y = self._policy(policy_id)

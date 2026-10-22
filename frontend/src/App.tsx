@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ProductsCatalog } from './components/ProductsCatalog';
@@ -34,8 +34,8 @@ export const App: React.FC = () => {
     {
       policy_id: 'POL-000001',
       product_id: 'P-000001',
-      farmer: '0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5',
-      insurer: '0x3252f04b1923B6fe4e53396f1FC80A0Db1CB3C17',
+      farmer: '0xAfc40A8D303e15e3D80572c530Bb0AD3f669e609',
+      insurer: '0x1E878a57ce79073a3A44640f1C92C362E7e8492d',
       crop: 'Maize (Zea mays)',
       region: 'Federal Capital Territory, Abuja, Nigeria',
       lat: '9.06',
@@ -60,9 +60,9 @@ export const App: React.FC = () => {
     },
     {
       policy_id: 'POL-000002',
-      product_id: 'P-000002',
-      farmer: '0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5',
-      insurer: '0x3252f04b1923B6fe4e53396f1FC80A0Db1CB3C17',
+      product_id: 'P-000001',
+      farmer: '0xd055e95b0f06B87Fdcc9938076F52c17A34781Ad',
+      insurer: '0x1E878a57ce79073a3A44640f1C92C362E7e8492d',
       crop: 'Hard Red Winter Wheat',
       region: 'Pampas Humedas, Cordoba, Argentina',
       lat: '-31.42',
@@ -106,18 +106,7 @@ export const App: React.FC = () => {
 
   const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([
     {
-      evidence_id: 'EV-000001',
-      policy_id: 'POL-000002',
-      kind: 'PHOTO',
-      by: 'FARMER',
-      stage: 'CONTEST',
-      caption: 'Drone multispectral capture demonstrating crop canopy senescence and leaf rolling',
-      url: 'https://ipfs.io/ipfs/QmZtmD2qt8fJv32Sm8E4a2z98k3P1u4A',
-      sha256: '4f81c9a632e1859bf5bb12a52efc15a7698501e389e8751f8b4172551a319f6a',
-      filed_at: '2026-07-23T09:30:00Z',
-    },
-    {
-      evidence_id: 'EV-000002',
+      evidence_id: 'E-000001',
       policy_id: 'POL-000002',
       kind: 'PAGE',
       by: 'FARMER',
@@ -129,12 +118,38 @@ export const App: React.FC = () => {
     },
   ]);
 
+  // Sync real state from on-chain contract
+  const fetchOnChainState = async () => {
+    try {
+      const onChainProds = await genlayerService.listProducts(0, 50);
+      if (Array.isArray(onChainProds) && onChainProds.length > 0) {
+        setProducts(onChainProds);
+      }
+      const onChainPols = await genlayerService.listPolicies(0, 50);
+      if (Array.isArray(onChainPols) && onChainPols.length > 0) {
+        setPolicies(onChainPols);
+      }
+      if (connectedAddress) {
+        const bal = await genlayerService.getBalance(connectedAddress);
+        if (bal?.claimable_wei) {
+          setUserClaimableWei(bal.claimable_wei);
+        }
+      }
+    } catch (e) {
+      console.warn('[Sync] On-chain read sync notice:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchOnChainState();
+  }, [connectedAddress]);
+
   const addToast = (type: 'success' | 'info' | 'error', title: string, message: string) => {
     const id = Date.now().toString();
     setToasts((prev) => [...prev, { id, type, title, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000);
+    }, 6000);
   };
 
   const removeToast = (id: string) => {
@@ -142,8 +157,8 @@ export const App: React.FC = () => {
   };
 
   // Protocol Stats
-  const totalFundedWei = products.reduce((acc, p) => acc + BigInt(p.funded_wei), BigInt(0));
-  const totalReservedWei = products.reduce((acc, p) => acc + BigInt(p.reserved_wei), BigInt(0));
+  const totalFundedWei = products.reduce((acc, p) => acc + BigInt(p.funded_wei || '0'), BigInt(0));
+  const totalReservedWei = products.reduce((acc, p) => acc + BigInt(p.reserved_wei || '0'), BigInt(0));
   const totalFundedGen = (Number(totalFundedWei) / 1e18).toFixed(2);
   const totalReservedGen = (Number(totalReservedWei) / 1e18).toFixed(2);
   const activeCount = policies.filter((p) => p.state === 'ACTIVE').length;
@@ -153,40 +168,7 @@ export const App: React.FC = () => {
     : 150;
 
   // Handler: Buy Coverage Policy
-  const handleBuyPolicy = async (product: Product, farmerAddress: string) => {
-    const nextPolicyNum = policies.length + 1;
-    const policyId = `POL-${String(nextPolicyNum).padStart(6, '0')}`;
-    const now = new Date();
-    const endDate = new Date(now.getTime() + product.window_days * 86400 * 1000);
-
-    const newPolicy: Policy = {
-      policy_id: policyId,
-      product_id: product.product_id,
-      farmer: farmerAddress,
-      insurer: product.insurer,
-      crop: product.crop,
-      region: product.region,
-      lat: product.lat,
-      lon: product.lon,
-      trigger: product.trigger,
-      threshold_tenths: product.threshold_tenths,
-      window_days: product.window_days,
-      window_start: now.toISOString(),
-      window_end: endDate.toISOString(),
-      premium_wei: product.premium_wei,
-      payout_wei: product.payout_wei,
-      primary: product.primary,
-      backup: product.backup,
-      dispute_clause: product.dispute_clause,
-      periods: product.periods,
-      replay: product.replay,
-      state: 'ACTIVE',
-      reserved: true,
-      paid_to_farmer: false,
-      round_count: 0,
-      bought_at: now.toISOString(),
-    };
-
+  const handleBuyPolicy = async (product: Product, _farmerAddress?: string) => {
     setActiveTx({
       txHash: '',
       explorerUrl: '',
@@ -195,6 +177,7 @@ export const App: React.FC = () => {
     });
 
     try {
+      const now = new Date();
       const seasonStart = product.replay ? (product as any).replay_start || '2026-08-01' : now.toISOString().split('T')[0];
       const res = await genlayerService.buyPolicy(
         product.product_id,
@@ -203,64 +186,28 @@ export const App: React.FC = () => {
         (progress) => setActiveTx(progress)
       );
 
-      setPolicies((prev) => [newPolicy, ...prev]);
-      setProducts((prev) =>
-        prev.map((p) => {
-          if (p.product_id === product.product_id) {
-            const newReserved = (BigInt(p.reserved_wei) + BigInt(product.payout_wei)).toString();
-            return {
-              ...p,
-              sold_count: p.sold_count + 1,
-              reserved_wei: newReserved,
-            };
-          }
-          return p;
-        })
-      );
+      // Use returned contract policy ID (e.g. Y-000001)
+      const policyId = typeof res.returnValue === 'string' && res.returnValue.startsWith('Y-')
+        ? res.returnValue
+        : `Y-${String(policies.length + 1).padStart(6, '0')}`;
+
+      await fetchOnChainState();
 
       addToast(
         'success',
-        'Policy Created & Escrow Locked',
+        'Policy Underwritten On-Chain',
         `Policy ${policyId} underwritten on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
       );
       setActiveTab('policies');
     } catch (err: any) {
       console.error('Buy policy error:', err);
-      // Fallback state update so user experience remains fluid
-      setPolicies((prev) => [newPolicy, ...prev]);
-      setActiveTab('policies');
+      // PRESERVE FAILED WRITES AS FAILURES: No optimistic mutation
+      addToast('error', 'Policy Purchase Failed', err?.message || 'Transaction rejected by GenVM smart contract.');
     }
   };
 
   // Handler: Publish New Product
   const handlePublishProduct = async (newProd: Partial<Product>) => {
-    const nextProdNum = products.length + 1;
-    const productId = `P-${String(nextProdNum).padStart(6, '0')}`;
-    const fullProduct: Product = {
-      product_id: productId,
-      insurer: connectedAddress || genlayerService.getSessionAddress(),
-      crop: newProd.crop || 'Crop Spec',
-      region: newProd.region || 'Region',
-      lat: newProd.lat || '0.0',
-      lon: newProd.lon || '0.0',
-      trigger: newProd.trigger || 'RAIN_BELOW',
-      threshold_tenths: newProd.threshold_tenths || 1000,
-      window_days: newProd.window_days || 14,
-      premium_wei: newProd.premium_wei || '100000000000000000',
-      payout_wei: newProd.payout_wei || '500000000000000000',
-      capacity: newProd.capacity || 20,
-      sold_count: 0,
-      funded_wei: '0',
-      reserved_wei: '0',
-      primary: 'OPEN_METEO',
-      backup: 'NASA_POWER',
-      dispute_clause: newProd.dispute_clause || 'Standard GenVest dispute clause under AI-validator consensus.',
-      periods: { contest: 86400, response: 86400, appeal: 86400 },
-      replay: false,
-      active: true,
-      created_at: new Date().toISOString(),
-    };
-
     setActiveTx({
       txHash: '',
       explorerUrl: '',
@@ -271,26 +218,33 @@ export const App: React.FC = () => {
     try {
       const res = await genlayerService.createProduct(
         {
-          crop: fullProduct.crop,
-          region: fullProduct.region,
-          lat: fullProduct.lat,
-          lon: fullProduct.lon,
-          trigger: fullProduct.trigger,
-          threshold_tenths: fullProduct.threshold_tenths,
-          window_days: fullProduct.window_days,
-          premium_wei: fullProduct.premium_wei,
-          payout_wei: fullProduct.payout_wei,
-          capacity: fullProduct.capacity,
-          primary: fullProduct.primary,
-          backup: fullProduct.backup,
-          dispute_clause: fullProduct.dispute_clause,
-          periods: fullProduct.periods,
-          replay: false,
+          crop: newProd.crop || 'Crop Spec',
+          region: newProd.region || 'Region',
+          lat: newProd.lat || '9.06',
+          lon: newProd.lon || '7.49',
+          trigger: newProd.trigger || 'RAIN_BELOW',
+          threshold_tenths: newProd.threshold_tenths || 1400,
+          window_days: newProd.window_days || 14,
+          premium_wei: newProd.premium_wei || '100000000000000000',
+          payout_wei: newProd.payout_wei || '500000000000000000',
+          capacity: newProd.capacity || 20,
+          primary: newProd.primary || 'OPEN_METEO',
+          backup: newProd.backup || 'NASA_POWER',
+          dispute_clause: newProd.dispute_clause || 'Standard GenVest dispute clause under AI-validator consensus.',
+          periods: newProd.periods || { contest: 86400, response: 86400, appeal: 86400 },
+          replay: Boolean(newProd.replay),
+          replay_start: newProd.replay_start || (newProd.replay ? '2026-08-01' : undefined),
         },
         (progress) => setActiveTx(progress)
       );
 
-      setProducts((prev) => [fullProduct, ...prev]);
+      // Use returned contract product ID (e.g. P-000002)
+      const productId = typeof res.returnValue === 'string' && res.returnValue.startsWith('P-')
+        ? res.returnValue
+        : `P-${String(products.length + 1).padStart(6, '0')}`;
+
+      await fetchOnChainState();
+
       addToast(
         'success',
         'Product Published On-Chain',
@@ -298,7 +252,8 @@ export const App: React.FC = () => {
       );
     } catch (err: any) {
       console.error('Error creating product:', err);
-      setProducts((prev) => [fullProduct, ...prev]);
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Product Creation Failed', err?.message || 'Transaction rejected by GenVM smart contract.');
     }
   };
 
@@ -316,17 +271,7 @@ export const App: React.FC = () => {
       const res = await genlayerService.fundProduct(productId, addedWei, (progress) =>
         setActiveTx(progress)
       );
-      setProducts((prev) =>
-        prev.map((p) => {
-          if (p.product_id === productId) {
-            return {
-              ...p,
-              funded_wei: (BigInt(p.funded_wei) + BigInt(addedWei)).toString(),
-            };
-          }
-          return p;
-        })
-      );
+      await fetchOnChainState();
       addToast(
         'success',
         'Reserves Funded On-Chain',
@@ -334,17 +279,8 @@ export const App: React.FC = () => {
       );
     } catch (err: any) {
       console.error('Fund error:', err);
-      setProducts((prev) =>
-        prev.map((p) => {
-          if (p.product_id === productId) {
-            return {
-              ...p,
-              funded_wei: (BigInt(p.funded_wei) + BigInt(addedWei)).toString(),
-            };
-          }
-          return p;
-        })
-      );
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Funding Failed', err?.message || 'Transaction rejected by GenVM smart contract.');
     }
   };
 
@@ -359,59 +295,21 @@ export const App: React.FC = () => {
 
     try {
       const res = await genlayerService.readIndex(policyId, (progress) => setActiveTx(progress));
-      setPolicies((prev) =>
-        prev.map((p) => {
-          if (p.policy_id === policyId) {
-            return {
-              ...p,
-              state: 'READ',
-              reading: {
-                at: new Date().toISOString(),
-                selected: 'OPEN_METEO',
-                other: 'NASA_POWER',
-                triggered: true,
-                series: {},
-                summaries: {},
-                other_triggers: true,
-              },
-            };
-          }
-          return p;
-        })
-      );
+      await fetchOnChainState();
       addToast(
         'info',
         'Satellite Reading Processed',
-        `Open-Meteo ERA5 & NASA MERRA-2 recorded on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+        `Dual satellite cross-check recorded on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
       );
     } catch (err: any) {
       console.error('Read index error:', err);
-      setPolicies((prev) =>
-        prev.map((p) => {
-          if (p.policy_id === policyId) {
-            return {
-              ...p,
-              state: 'READ',
-              reading: {
-                at: new Date().toISOString(),
-                selected: 'OPEN_METEO',
-                other: 'NASA_POWER',
-                triggered: true,
-                series: {},
-                summaries: {},
-                other_triggers: true,
-              },
-            };
-          }
-          return p;
-        })
-      );
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Satellite Read Failed', err?.message || 'Observation window not yet complete.');
     }
   };
 
   // Handler: Contest Policy
   const handleContest = async (policyId: string, statement: string) => {
-    const now = new Date();
     setActiveTx({
       txHash: '',
       explorerUrl: '',
@@ -420,28 +318,10 @@ export const App: React.FC = () => {
     });
 
     try {
-      const res = await genlayerService.fileContest(policyId, statement, '10000000000000000', (progress) =>
+      const res = await genlayerService.contest(policyId, statement, '10000000000000000', (progress) =>
         setActiveTx(progress)
       );
-      setPolicies((prev) =>
-        prev.map((p) => {
-          if (p.policy_id === policyId) {
-            return {
-              ...p,
-              state: 'CONTESTED',
-              contest: {
-                by: 'FARMER',
-                statement,
-                bond_wei: '10000000000000000',
-                opened_at: now.toISOString(),
-                response_ends: new Date(now.getTime() + 86400000).toISOString(),
-                lapse_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
-              },
-            };
-          }
-          return p;
-        })
-      );
+      await fetchOnChainState();
       addToast(
         'info',
         'Dispute Contest Registered',
@@ -449,83 +329,161 @@ export const App: React.FC = () => {
       );
     } catch (err: any) {
       console.error('Contest error:', err);
-      setPolicies((prev) =>
-        prev.map((p) => {
-          if (p.policy_id === policyId) {
-            return {
-              ...p,
-              state: 'CONTESTED',
-              contest: {
-                by: 'FARMER',
-                statement,
-                bond_wei: '10000000000000000',
-                opened_at: now.toISOString(),
-                response_ends: new Date(now.getTime() + 86400000).toISOString(),
-                lapse_at: new Date(now.getTime() + 2 * 86400000).toISOString(),
-              },
-            };
-          }
-          return p;
-        })
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Contest Submission Failed', err?.message || 'Datasets agreed or contest window closed.');
+    }
+  };
+
+  // Handler: Response Counter-Statement
+  const handleAnswer = async (policyId: string, statement: string) => {
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'answer',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.answer(policyId, statement, (progress) =>
+        setActiveTx(progress)
       );
+      await fetchOnChainState();
+      addToast(
+        'success',
+        'Counter-Statement Logged',
+        `Response statement committed on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Answer error:', err);
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Response Submission Failed', err?.message || 'Unauthorized or response window closed.');
     }
   };
 
   // Handler: File Evidence
-  const handleFileEvidence = (
+  const handleFileEvidence = async (
     policyId: string,
     kind: 'PHOTO' | 'PAGE',
     caption: string,
     url: string
   ) => {
-    const evId = `EV-${String(evidenceItems.length + 1).padStart(6, '0')}`;
-    const hash = 'a' + Math.random().toString(16).substring(2, 10) + '9b' + Math.random().toString(16).substring(2, 10) + 'c7' + Math.random().toString(16).substring(2, 10);
-    const newEv: EvidenceItem = {
-      evidence_id: evId,
-      policy_id: policyId,
-      kind,
-      by: 'FARMER',
-      stage: 'CONTEST',
-      caption,
-      url: url || 'https://ipfs.io/ipfs/' + hash.slice(0, 32),
-      sha256: hash,
-      filed_at: new Date().toISOString(),
-    };
-    setEvidenceItems((prev) => [...prev, newEv]);
-    addToast('success', 'Evidence Filed On-Chain', `Attachment ${evId} logged with SHA-256 hash.`);
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'file_page',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.filePage(policyId, caption, url, (progress) =>
+        setActiveTx(progress)
+      );
+      
+      const evId = typeof res.returnValue === 'object' && res.returnValue?.evidence_id
+        ? res.returnValue.evidence_id
+        : `E-${String(evidenceItems.length + 1).padStart(6, '0')}`;
+
+      const newEv: EvidenceItem = {
+        evidence_id: evId,
+        policy_id: policyId,
+        kind,
+        by: 'FARMER',
+        stage: 'CONTEST',
+        caption,
+        url,
+        sha256: res.txHash.slice(2, 66),
+        filed_at: new Date().toISOString(),
+      };
+      setEvidenceItems((prev) => [newEv, ...prev]);
+      await fetchOnChainState();
+      addToast('success', 'Evidence Filed On-Chain', `Evidence ${evId} logged on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`);
+    } catch (err: any) {
+      console.error('File evidence error:', err);
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Evidence Submission Failed', err?.message || 'Evidence limit reached or invalid URL.');
+    }
   };
 
   // Handler: Decide Dispute via AI-Validator consensus
-  const handleDecideDispute = (policyId: string) => {
-    setPolicies((prev) =>
-      prev.map((p) => {
-        if (p.policy_id === policyId) {
-          return {
-            ...p,
-            state: 'DECIDED',
-            decision: {
-              verdict: 'USE_OTHER',
-              outcome: true,
-              round: 1,
-              against: ['OPEN_METEO'],
-            },
-          };
-        }
-        return p;
-      })
-    );
-    addToast(
-      'success',
-      'AI Consensus Reached',
-      `Validators ruled USE_OTHER under dispute clause. Payout authorized for Policy ${policyId}.`
-    );
+  const handleDecideDispute = async (policyId: string) => {
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'decide_contest',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.decideContest(policyId, (progress) =>
+        setActiveTx(progress)
+      );
+      await fetchOnChainState();
+      addToast(
+        'success',
+        'AI Consensus Reached',
+        `Dispute adjudicated against signed clause on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Decide dispute error:', err);
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Adjudication Failed', err?.message || 'Dispute resolution requires valid state.');
+    }
+  };
+
+  // Handler: Escalate Appeal
+  const handleAppeal = async (policyId: string, statement: string) => {
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'appeal',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.appeal(policyId, statement, '10000000000000000', (progress) =>
+        setActiveTx(progress)
+      );
+      await fetchOnChainState();
+      addToast(
+        'info',
+        'Appeal Escalated On-Chain',
+        `Escalated to second-tier consensus committee (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Appeal error:', err);
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Appeal Escalation Failed', err?.message || 'Appeal window closed or unauthorized.');
+    }
+  };
+
+  // Handler: Decide Appeal
+  const handleDecideAppeal = async (policyId: string) => {
+    setActiveTx({
+      txHash: '',
+      explorerUrl: '',
+      methodName: 'decide_appeal',
+      status: 'SUBMITTED',
+    });
+
+    try {
+      const res = await genlayerService.decideAppeal(policyId, (progress) =>
+        setActiveTx(progress)
+      );
+      await fetchOnChainState();
+      addToast(
+        'success',
+        'Appeal Decision Finalized',
+        `Higher-tier consensus committee ruled on StudioNet (Tx: ${res.txHash.slice(0, 10)}...).`
+      );
+    } catch (err: any) {
+      console.error('Decide appeal error:', err);
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Appeal Adjudication Failed', err?.message || 'Higher-tier consensus failure.');
+    }
   };
 
   // Handler: Finalize Policy
   const handleFinalize = async (policyId: string) => {
-    const targetPolicy = policies.find((p) => p.policy_id === policyId);
-    if (!targetPolicy) return;
-
     setActiveTx({
       txHash: '',
       explorerUrl: '',
@@ -533,25 +491,11 @@ export const App: React.FC = () => {
       status: 'SUBMITTED',
     });
 
-    const isFarmerPaid = targetPolicy.reading?.triggered || targetPolicy.decision?.outcome === true;
-
     try {
-      const res = await genlayerService.finalizePolicy(policyId, (progress) => setActiveTx(progress));
-      if (isFarmerPaid) {
-        setUserClaimableWei((prev) => (BigInt(prev) + BigInt(targetPolicy.payout_wei)).toString());
-      }
-      setPolicies((prev) =>
-        prev.map((p) => {
-          if (p.policy_id === policyId) {
-            return {
-              ...p,
-              state: 'SETTLED',
-              paid_to_farmer: isFarmerPaid,
-            };
-          }
-          return p;
-        })
+      const res = await genlayerService.finalizePolicy(policyId, (progress) =>
+        setActiveTx(progress)
       );
+      await fetchOnChainState();
       addToast(
         'success',
         'Claim Finalized On-Chain',
@@ -559,21 +503,8 @@ export const App: React.FC = () => {
       );
     } catch (err: any) {
       console.error('Finalize error:', err);
-      if (isFarmerPaid) {
-        setUserClaimableWei((prev) => (BigInt(prev) + BigInt(targetPolicy.payout_wei)).toString());
-      }
-      setPolicies((prev) =>
-        prev.map((p) => {
-          if (p.policy_id === policyId) {
-            return {
-              ...p,
-              state: 'SETTLED',
-              paid_to_farmer: isFarmerPaid,
-            };
-          }
-          return p;
-        })
-      );
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Finalization Failed', err?.message || 'Contest or appeal window remains open.');
     }
   };
 
@@ -590,6 +521,7 @@ export const App: React.FC = () => {
       const res = await genlayerService.claimPayout((progress) => setActiveTx(progress));
       const claimedGen = (Number(userClaimableWei) / 1e18).toFixed(2);
       setUserClaimableWei('0');
+      await fetchOnChainState();
       addToast(
         'success',
         'Funds Withdrawn On-Chain',
@@ -597,13 +529,8 @@ export const App: React.FC = () => {
       );
     } catch (err: any) {
       console.error('Claim error:', err);
-      const claimedGen = (Number(userClaimableWei) / 1e18).toFixed(2);
-      setUserClaimableWei('0');
-      addToast(
-        'success',
-        'Funds Withdrawn',
-        `Successfully transferred ${claimedGen} GEN to wallet ${connectedAddress.slice(0, 8)}...`
-      );
+      // PRESERVE FAILED WRITES AS FAILURES
+      addToast('error', 'Claim Withdrawal Failed', err?.message || 'No claimable balance found for signer address.');
     }
   };
 
@@ -674,8 +601,11 @@ export const App: React.FC = () => {
               evidenceItems={evidenceItems}
               onReadIndex={handleReadIndex}
               onContest={handleContest}
+              onAnswer={handleAnswer}
               onFileEvidence={handleFileEvidence}
               onDecideDispute={handleDecideDispute}
+              onAppeal={handleAppeal}
+              onDecideAppeal={handleDecideAppeal}
               onFinalize={handleFinalize}
               onClaimBalance={handleClaimBalance}
               userClaimableWei={userClaimableWei}

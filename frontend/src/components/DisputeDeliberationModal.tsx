@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Scale, 
   ShieldCheck, 
@@ -24,7 +24,6 @@ export const DisputeDeliberationModal: React.FC<DisputeDeliberationModalProps> =
   onClose,
   onDecideDispute,
 }) => {
-  const [isDeciding, setIsDeciding] = useState(false);
 
   // Simulated AI-validator consensus votes for demonstration of GenLayer Optimistic Democracy
   const validators = [
@@ -58,12 +57,9 @@ export const DisputeDeliberationModal: React.FC<DisputeDeliberationModalProps> =
     },
   ];
 
-  const handleSimulateDecision = () => {
-    setIsDeciding(true);
-    setTimeout(() => {
-      onDecideDispute(policy.policy_id);
-      setIsDeciding(false);
-    }, 1200);
+  const handleExecuteDecision = () => {
+    onDecideDispute(policy.policy_id);
+    onClose();
   };
 
   return (
@@ -199,11 +195,10 @@ export const DisputeDeliberationModal: React.FC<DisputeDeliberationModalProps> =
                   <button
                     id="execute-adjudication-btn"
                     className="btn btn-primary btn-block btn-lg"
-                    disabled={isDeciding}
-                    onClick={handleSimulateDecision}
+                    onClick={handleExecuteDecision}
                   >
                     <Scale size={18} />
-                    <span>{isDeciding ? 'Finalizing Validator Consensus...' : 'Execute AI-Validator Consensus Verdict'}</span>
+                    <span>Execute AI-Validator Consensus Verdict</span>
                   </button>
                 </div>
               )}

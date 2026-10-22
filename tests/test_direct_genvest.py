@@ -683,3 +683,124 @@ def test_web_page_evidence_consensus(direct_vm, direct_deploy, direct_alice, dir
     assert len(ev_list) == 1
     assert ev_list[0]["kind"] == "PAGE"
     assert ev_list[0]["url"] == "https://metagency.gov.ng/bulletin-aug-2026"
+
+
+def test_settlement_accounting_invariant_segregation_and_claim(direct_vm, direct_deploy, direct_alice, direct_bob):
+    """
+    CRITICAL INVARIANT TEST:
+    Ensures that upon policy settlement with triggered payout:
+    1. Farmer payout remains strictly segregated from withdrawable and reusable product capital.
+    2. Attempted withdrawal by underwriter of settled payout capital MUST BE REJECTED.
+    3. Attempted reuse of settled payout capital for new policies MUST BE REJECTED.
+    4. Farmer successfully claims payout from pull-ledger.
+    5. Pool capital invariants hold before, during, and after claim.
+    """
+    direct_vm.warp(BASE_TIME)
+    contract = deploy(direct_deploy)
+
+    # 1. Alice (Underwriter) creates product: premium = 0.1 GEN, payout = 1.0 GEN
+    direct_vm.sender = direct_alice
+    pid = contract.create_product(json.dumps(sample_product_params(
+        premium_wei=10**17,      # 0.1 GEN
+        payout_wei=10**18,       # 1.0 GEN
+        capacity=5,
+        replay=True,
+        replay_start="2026-08-01"
+    )))
+
+    # Alice funds exactly 1.0 GEN into the underwriting capital pool
+    direct_vm.value = 10**18
+    contract.fund_product(pid)
+
+    prod = contract.get_product(pid)
+    assert prod["funded_wei"] == str(10**18)
+    assert prod["reserved_wei"] == "0"
+    assert prod["paid_out_wei"] == "0"
+
+    # 2. Bob (Farmer) buys policy for 0.1 GEN exact premium
+    direct_vm.sender = direct_bob
+    direct_vm.value = 10**17
+    yid = contract.buy_policy(pid, "2026-08-01")
+
+    # Invariant: exactly 1.0 GEN is now reserved; available pool capital is 0
+    prod_locked = contract.get_product(pid)
+    assert prod_locked["funded_wei"] == str(10**18)
+    assert prod_locked["reserved_wei"] == str(10**18)
+    avail_before = int(prod_locked["funded_wei"]) - int(prod_locked["reserved_wei"])
+    assert avail_before == 0
+
+    # 3. Reading phase: Weather triggers payout condition (drought)
+    direct_vm.warp("2026-08-20T12:00:00Z")
+    dates = [(date(2026, 8, 1) + timedelta(days=i)).isoformat() for i in range(14)]
+    # Both datasets report drought (5.0 mm/day total 70 mm < 140 mm threshold)
+    om_json = json.dumps({"daily": {"time": dates, "precipitation_sum": [5.0] * 14}})
+    nasa_props = {d.replace("-", ""): 5.0 for d in dates}
+    nasa_json = json.dumps({"properties": {"parameter": {"PRECTOTCORR": nasa_props}}})
+    direct_vm.mock_web(r".*open-meteo\.com.*", {"status": 200, "body": om_json})
+    direct_vm.mock_web(r".*power\.larc\.nasa\.gov.*", {"status": 200, "body": nasa_json})
+    contract.read_index(yid)
+
+    # Warp past contest window and finalize settlement
+    direct_vm.warp("2026-08-22T00:00:00Z")
+    finalize_res = json.loads(contract.finalize(yid))
+    assert finalize_res["state"] == "SETTLED"
+    assert finalize_res["paid_to_farmer"] is True
+
+    # 4. Immediate Post-Settlement State (BEFORE Bob claims payout)
+    # Bob has not called claim yet!
+    bob_bal = contract.get_balance(addr_hex(direct_bob))
+    assert bob_bal["claimable_wei"] == str(10**18)
+    assert bob_bal["claimed_wei"] == "0"
+
+    # INVARIANT: Product capital accounting must have permanently deducted the payout
+    prod_settled = contract.get_product(pid)
+    assert prod_settled["funded_wei"] == "0", "Funded pool capital must be reduced to 0 upon payout settlement"
+    assert prod_settled["reserved_wei"] == "0", "Reserved pool capital must be released"
+    assert prod_settled["paid_out_wei"] == str(10**18), "Product paid_out_wei must track settled payout"
+    avail_settled = int(prod_settled["funded_wei"]) - int(prod_settled["reserved_wei"])
+    assert avail_settled == 0, "Available unreserved capital must be 0"
+
+    # 5. ATTEMPTED WITHDRAWAL BY UNDERWRITER MUST BE REJECTED
+    # Alice attempts to withdraw from the pool (trying to withdraw Bob's segregated payout)
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    with pytest.raises(Exception) as exc_withdraw:
+        contract.withdraw_capital(pid, 10**16)  # Minimum withdrawal (0.01 GEN) cannot be stolen
+    assert "withdrawal exceeds available unreserved capital" in str(exc_withdraw.value)
+
+    with pytest.raises(Exception) as exc_withdraw_all:
+        contract.withdraw_capital(pid, 10**18)
+    assert "withdrawal exceeds available unreserved capital" in str(exc_withdraw_all.value)
+
+    # 6. ATTEMPTED CAPITAL REUSE BY NEW POLICY MUST BE REJECTED
+    # Bob or another farmer attempts to buy a new policy expecting coverage from depleted pool
+    direct_vm.sender = direct_bob
+    direct_vm.value = 10**17
+    with pytest.raises(Exception) as exc_reuse:
+        contract.buy_policy(pid, "2026-08-01")
+    assert "underwriting pool lacks unreserved capacity to guarantee payout" in str(exc_reuse.value)
+
+    # 7. FARMER CLAIMS SEGREGATED PAYOUT
+    direct_vm.sender = direct_bob
+    direct_vm.value = 0
+    claim_res = json.loads(contract.claim())
+    assert claim_res["account"] == addr_hex(direct_bob)
+    assert claim_res["claimed_wei"] == str(10**18)
+
+    bob_after_claim = contract.get_balance(addr_hex(direct_bob))
+    assert bob_after_claim["claimable_wei"] == "0"
+    assert bob_after_claim["claimed_wei"] == str(10**18)
+
+    # 8. POST-CLAIM INVARIANT CHECK
+    # Underwriter still cannot withdraw
+    direct_vm.sender = direct_alice
+    with pytest.raises(Exception) as exc_post_withdraw:
+        contract.withdraw_capital(pid, 10**16)
+    assert "withdrawal exceeds available unreserved capital" in str(exc_post_withdraw.value)
+
+    # Product state remains invariant
+    prod_final = contract.get_product(pid)
+    assert prod_final["funded_wei"] == "0"
+    assert prod_final["reserved_wei"] == "0"
+    assert prod_final["paid_out_wei"] == str(10**18)
+

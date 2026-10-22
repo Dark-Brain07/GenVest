@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { genlayerService, ROLE_ACCOUNTS } from '../services/genlayerService';
 
 export const STUDIO_NET_CONFIG = {
   chainId: '0xF22F', // 61999 in hex
@@ -22,30 +23,35 @@ export interface WalletContextType {
   isCorrectNetwork: boolean;
   walletName: string;
   hasInjectedWallet: boolean;
+  activeRole: 'UNDERWRITER' | 'FARMER' | 'CUSTOM' | 'INJECTED';
   connectInjected: () => Promise<void>;
+  connectRoleAccount: (role: 'UNDERWRITER' | 'FARMER') => void;
+  connectCustomKey: (privateKey: string) => void;
   connectSimulated: (address: string, label: string) => void;
   disconnect: () => void;
   switchToStudioNet: () => Promise<void>;
+  refreshBalances: () => Promise<void>;
   error: string | null;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-// Default address (Alice underwriter for preview)
-const DEFAULT_PREVIEW_ADDRESS = '0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5';
-
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // CRITICAL: The displayed application wallet address is ALWAYS derived from the actual transaction signer!
   const [address, setAddress] = useState<string>(() => {
-    return localStorage.getItem('genvest_wallet_address') || DEFAULT_PREVIEW_ADDRESS;
+    return genlayerService.getSignerAddress();
   });
-  const [isConnected, setIsConnected] = useState<boolean>(() => {
-    return localStorage.getItem('genvest_is_connected') === 'true';
-  });
+
+  const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [balanceGen, setBalanceGen] = useState<string>('12.50');
-  const [chainId, setChainId] = useState<number | null>(null);
+  const [balanceGen, setBalanceGen] = useState<string>('10.000');
+  const [chainId, setChainId] = useState<number | null>(61999);
+  const [activeRole, setActiveRole] = useState<'UNDERWRITER' | 'FARMER' | 'CUSTOM' | 'INJECTED'>('UNDERWRITER');
   const [walletName, setWalletName] = useState<string>(() => {
-    return localStorage.getItem('genvest_wallet_name') || 'Simulated Underwriter';
+    const signer = genlayerService.getSignerAddress().toLowerCase();
+    if (signer === ROLE_ACCOUNTS.UNDERWRITER.address.toLowerCase()) return ROLE_ACCOUNTS.UNDERWRITER.label;
+    if (signer === ROLE_ACCOUNTS.FARMER.address.toLowerCase()) return ROLE_ACCOUNTS.FARMER.label;
+    return 'StudioNet Session Signer';
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -53,8 +59,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const hasInjectedWallet = Boolean(ethereum);
 
   const fetchBalance = async (accAddress: string) => {
-    if (ethereum && isConnected && walletName !== 'Simulated Underwriter' && !walletName.startsWith('Simulated')) {
-      try {
+    if (!accAddress) return;
+    try {
+      if (ethereum && activeRole === 'INJECTED') {
         const balHex = await ethereum.request({
           method: 'eth_getBalance',
           params: [accAddress, 'latest'],
@@ -62,10 +69,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balWei = BigInt(balHex);
         const bal = (Number(balWei) / 1e18).toFixed(3);
         setBalanceGen(bal);
-      } catch {
-        setBalanceGen('0.000');
+      } else {
+        // Query contract ledger balance for session account
+        const ledger = await genlayerService.getBalance(accAddress);
+        const claimable = BigInt(ledger?.claimable_wei || '0');
+        const claimed = BigInt(ledger?.claimed_wei || '0');
+        const displayBal = (Number(claimable + claimed) / 1e18 + 10.0).toFixed(3);
+        setBalanceGen(displayBal);
       }
+    } catch {
+      setBalanceGen('10.000');
     }
+  };
+
+  const refreshBalances = async () => {
+    await fetchBalance(address);
   };
 
   const checkNetwork = async () => {
@@ -80,18 +98,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    if (ethereum) {
+    if (ethereum && activeRole === 'INJECTED') {
       checkNetwork();
 
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length === 0) {
           disconnect();
         } else {
-          setAddress(accounts[0]);
+          const primary = accounts[0];
+          genlayerService.setInjectedSigner(ethereum, primary);
+          setAddress(primary);
           setIsConnected(true);
-          localStorage.setItem('genvest_wallet_address', accounts[0]);
-          localStorage.setItem('genvest_is_connected', 'true');
-          fetchBalance(accounts[0]);
+          fetchBalance(primary);
         }
       };
 
@@ -107,8 +125,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ethereum.removeListener?.('chainChanged', handleChainChanged);
       };
     }
-  }, [ethereum]);
+  }, [ethereum, activeRole]);
 
+  useEffect(() => {
+    fetchBalance(address);
+  }, [address]);
+
+  // Connect Injected Browser Wallet (MetaMask, Rabby, etc.)
   const connectInjected = async () => {
     setError(null);
     if (!ethereum) {
@@ -121,8 +144,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
       if (accounts && accounts.length > 0) {
         const primary = accounts[0];
+        // Ensure genlayer-js signs with this exact address via injected provider
+        genlayerService.setInjectedSigner(ethereum, primary);
+
         setAddress(primary);
         setIsConnected(true);
+        setActiveRole('INJECTED');
 
         let detectedName = 'Browser Wallet';
         if (ethereum.isMetaMask) detectedName = 'MetaMask';
@@ -145,6 +172,51 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Switch between pre-configured role accounts (Alice Underwriter or Bob Farmer)
+  const connectRoleAccount = (role: 'UNDERWRITER' | 'FARMER') => {
+    const roleConfig = ROLE_ACCOUNTS[role];
+    const newAddr = genlayerService.setSessionPrivateKey(roleConfig.privateKey);
+    setAddress(newAddr);
+    setIsConnected(true);
+    setActiveRole(role);
+    setWalletName(roleConfig.label);
+    setChainId(STUDIO_NET_CONFIG.chainIdDecimal);
+    fetchBalance(newAddr);
+  };
+
+  // Connect via custom private key
+  const connectCustomKey = (privateKey: string) => {
+    try {
+      const newAddr = genlayerService.setSessionPrivateKey(privateKey);
+      setAddress(newAddr);
+      setIsConnected(true);
+      setActiveRole('CUSTOM');
+      setWalletName(`Custom Account (${newAddr.slice(0, 6)}...${newAddr.slice(-4)})`);
+      setChainId(STUDIO_NET_CONFIG.chainIdDecimal);
+      fetchBalance(newAddr);
+    } catch (err: any) {
+      setError(err?.message || 'Invalid private key format');
+    }
+  };
+
+  // Compatibility helper
+  const connectSimulated = (_simAddress: string, label: string) => {
+    if (label.toLowerCase().includes('bob') || label.toLowerCase().includes('farmer')) {
+      connectRoleAccount('FARMER');
+    } else {
+      connectRoleAccount('UNDERWRITER');
+    }
+  };
+
+  const disconnect = () => {
+    const fallbackAddr = genlayerService.disconnectInjected();
+    setIsConnected(true);
+    setAddress(fallbackAddr);
+    setActiveRole('UNDERWRITER');
+    setWalletName('Alice (Underwriter)');
+    fetchBalance(fallbackAddr);
+  };
+
   const switchToStudioNet = async () => {
     if (!ethereum) return;
     try {
@@ -154,7 +226,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
       setChainId(STUDIO_NET_CONFIG.chainIdDecimal);
     } catch (switchError: any) {
-      // Error code 4902 indicates that the chain has not been added to MetaMask
       if (switchError.code === 4902 || switchError?.data?.originalError?.code === 4902) {
         try {
           await ethereum.request({
@@ -171,27 +242,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const connectSimulated = (simAddress: string, label: string) => {
-    setAddress(simAddress);
-    setIsConnected(true);
-    setWalletName(`Simulated (${label})`);
-    setChainId(STUDIO_NET_CONFIG.chainIdDecimal);
-    setBalanceGen('25.000');
-    localStorage.setItem('genvest_wallet_address', simAddress);
-    localStorage.setItem('genvest_is_connected', 'true');
-    localStorage.setItem('genvest_wallet_name', `Simulated (${label})`);
-  };
-
-  const disconnect = () => {
-    setIsConnected(false);
-    setAddress(DEFAULT_PREVIEW_ADDRESS);
-    setWalletName('Disconnected');
-    setBalanceGen('0.000');
-    localStorage.removeItem('genvest_wallet_address');
-    localStorage.removeItem('genvest_is_connected');
-    localStorage.removeItem('genvest_wallet_name');
-  };
-
   const isCorrectNetwork = chainId === STUDIO_NET_CONFIG.chainIdDecimal || chainId === null;
 
   return (
@@ -205,10 +255,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isCorrectNetwork,
         walletName,
         hasInjectedWallet,
+        activeRole,
         connectInjected,
+        connectRoleAccount,
+        connectCustomKey,
         connectSimulated,
         disconnect,
         switchToStudioNet,
+        refreshBalances,
         error,
       }}
     >

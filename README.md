@@ -1,10 +1,11 @@
 # GenVest — Autonomous Climate & Crop Yield Hedging Protocol
 
 [![Live DApp](https://img.shields.io/badge/Live_DApp-genvest.vercel.app-000000?style=for-the-badge&logo=vercel)](https://genvest.vercel.app)
-[![GenLayer StudioNet](https://img.shields.io/badge/GenLayer-StudioNet_61999-10b981?style=for-the-badge&logo=ethereum)](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf)
-[![Intelligent Contract](https://img.shields.io/badge/GenVM-Intelligent_Contract-06b6d4?style=for-the-badge&logo=python)](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf)
-[![Direct Tests](https://img.shields.io/badge/pytest-16_passed-success?style=for-the-badge)](tests/test_direct_genvest.py)
+[![GenLayer StudioNet](https://img.shields.io/badge/GenLayer-StudioNet_61999-10b981?style=for-the-badge&logo=ethereum)](https://explorer-studio.genlayer.com/address/0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA)
+[![Intelligent Contract](https://img.shields.io/badge/GenVM-Intelligent_Contract-06b6d4?style=for-the-badge&logo=python)](https://explorer-studio.genlayer.com/address/0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA)
+[![Direct Tests](https://img.shields.io/badge/pytest-17_passed-success?style=for-the-badge)](tests/test_direct_genvest.py)
 [![GenVM Linter](https://img.shields.io/badge/genvm--linter-0_errors-brightgreen?style=for-the-badge)](contracts/genvest.py)
+[![Steward Resolution](https://img.shields.io/badge/Steward_Action-Resolved-blue?style=for-the-badge)](docs/steward-action-response.md)
 [![Sole Contributor](https://img.shields.io/badge/Sole_Author-Dark--Brain07-8b5cf6?style=for-the-badge)](https://github.com/Dark-Brain07)
 
 **GenVest** is a next-generation decentralized parametric crop and climate yield hedging protocol built natively on GenLayer's GenVM execution environment. It eliminates bureaucratic claims adjusters by combining:
@@ -21,16 +22,16 @@ The GenVest protocol and web application are fully deployed and live:
 | Property | Value |
 | :--- | :--- |
 | **Live Web DApp** | [`https://genvest.vercel.app`](https://genvest.vercel.app) |
+| **Steward Action Resolution Document** | [`docs/steward-action-response.md`](docs/steward-action-response.md) |
 | **Contract Name** | `GenVest` |
-| **Deployed Address** | [`0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf`](https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf) |
-| **Deployment Transaction** | [`0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7`](https://explorer-studio.genlayer.com/tx/0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7) |
-| **Flagship Product (`P-000001`)** | [`0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf`](https://explorer-studio.genlayer.com/tx/0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf) |
-| **Capital Reserve Funding (`P-000001`)** | [`0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8`](https://explorer-studio.genlayer.com/tx/0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8) |
-| **Product Creation (`P-000002`)** | [`0x07227e7c00c19f3edcd20ecc0a80989e03b357bef46d4e0024f8c1064268dbbb`](https://explorer-studio.genlayer.com/tx/0x07227e7c00c19f3edcd20ecc0a80989e03b357bef46d4e0024f8c1064268dbbb) |
-| **Product Funding (`P-000002`)** | [`0xb57078dba9891d97b086a7074c32a2c3c42e349c3dc79d65d0bca92d9dfee722`](https://explorer-studio.genlayer.com/tx/0xb57078dba9891d97b086a7074c32a2c3c42e349c3dc79d65d0bca92d9dfee722) |
-| **Policy Underwritten (`POL-000001`)** | [`0x2db24a38acce9c14e9cb438cbdb1d47a0ce4dd13f97f53c5ff46fb1e8229a1e9`](https://explorer-studio.genlayer.com/tx/0x2db24a38acce9c14e9cb438cbdb1d47a0ce4dd13f97f53c5ff46fb1e8229a1e9) |
-| **Frontend UI Product (`P-000003`)** | [`0x1a12a5e097ddd838068f1979752ed536c618feb2ad14ba82aea41253a64aeba9`](https://explorer-studio.genlayer.com/tx/0x1a12a5e097ddd838068f1979752ed536c618feb2ad14ba82aea41253a64aeba9) |
-| **Deployer Account** | `0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5` |
+| **Deployed Address** | [`0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA`](https://explorer-studio.genlayer.com/address/0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA) |
+| **Deployment Transaction** | [`0xb81684597036ca5c4cb8d934d2e59ed3a74e3909626f9db0ada7999cc6b57912`](https://explorer-studio.genlayer.com/tx/0xb81684597036ca5c4cb8d934d2e59ed3a74e3909626f9db0ada7999cc6b57912) |
+| **Flagship Product (`P-000001`)** | [`0x282496da79fc9d41ddb8802822febf0a0749ae749ce7994bd327d7d551c4a6fb`](https://explorer-studio.genlayer.com/tx/0x282496da79fc9d41ddb8802822febf0a0749ae749ce7994bd327d7d551c4a6fb) |
+| **Capital Reserve Funding (`P-000001`)** | [`0x08103a5208789c932c918758ea37160b706beccf1ea6783f0a76aa6c60315efc`](https://explorer-studio.genlayer.com/tx/0x08103a5208789c932c918758ea37160b706beccf1ea6783f0a76aa6c60315efc) |
+| **Frontend Product Creation (`P-000002`)** | [`0x89cc18566340249c2a1c2c4cd6379344f77ec4a28b46467a0b60f2a6e9975b36`](https://explorer-studio.genlayer.com/tx/0x89cc18566340249c2a1c2c4cd6379344f77ec4a28b46467a0b60f2a6e9975b36) |
+| **Frontend Reserve Funding (`P-000002`)** | [`0x40a7b08fe2a070d2556aa51dfe761a0f1c60c5648fd26a87a3734dd9d3735cd4`](https://explorer-studio.genlayer.com/tx/0x40a7b08fe2a070d2556aa51dfe761a0f1c60c5648fd26a87a3734dd9d3735cd4) |
+| **Frontend Policy Purchase (`Y-000001`)** | [`0x0d81dcab778f41d176563127fdc6ea98b20a0fc692e0ada8f2819a207174f709`](https://explorer-studio.genlayer.com/tx/0x0d81dcab778f41d176563127fdc6ea98b20a0fc692e0ada8f2819a207174f709) |
+| **Deployer Account** | `0x8C69e68B218191ce4839FBe1aEE70388113921B2` |
 | **Network** | GenLayer StudioNet (Chain ID: `61999`, Gasless) |
 | **Pinned Runner Version** | `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }` |
 
@@ -135,7 +136,7 @@ Every item of the mandatory GenLayer protocol audit has been verified:
 | **3** | **Zero-Revert Fallback Evidence** | **PASSED** | All web fetches and media URLs feature defensive fallbacks; missing links or network outages never cause unhandled GenVM exceptions. |
 | **4** | **Consensus & Equivalence Principle** | **PASSED** | `gl.eq_principle.prompt_comparative` instructs validator LLMs to evaluate only the primary verdict (`STANDS` / `USE_OTHER` / `NO_RELIABLE_READING`), preventing token mismatch disagreements. |
 | **5** | **Syntax, AST & Lint Audit** | **PASSED** | Zero AST errors via `python -m py_compile`. Passed `genvm-lint check contracts/genvest.py --json` with 0 errors. Zero forbidden stdlib modules. |
-| **6** | **Live Chain Execution Audit** | **PASSED** | Finalized on GenLayer StudioNet (`0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf`), product `P-000001` initialized, and 0.20 GEN capital reserves deposited. |
+| **6** | **Live Chain Execution Audit** | **PASSED** | Finalized on GenLayer StudioNet (`0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA`), flagship product `P-000001` initialized, and live frontend write transactions (`P-000002`, `Y-000001`) broadcast and finalized via `genlayer-js`. |
 
 ---
 
@@ -145,7 +146,7 @@ Every item of the mandatory GenLayer protocol audit has been verified:
 ```bash
 python -m pytest tests/test_direct_genvest.py -v
 ```
-**Results:** `16 passed in 0.96s`
+**Results:** `17 passed in 0.99s` (including settlement accounting invariant segregation and claim)
 
 ### 2. Contract Linter
 ```bash

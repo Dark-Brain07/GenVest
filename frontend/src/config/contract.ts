@@ -2,20 +2,20 @@ export const CONTRACT_CONFIG = {
   network: 'GenLayer StudioNet',
   chainId: 61999,
   rpcUrl: 'https://studio.genlayer.com/api',
-  contractAddress: '0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf',
-  deployTxHash: '0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7',
-  explorerContractUrl: 'https://explorer-studio.genlayer.com/address/0x59f3A3d77e1e974fd0CEA61a0F56E64844474CEf',
-  explorerTxUrl: 'https://explorer-studio.genlayer.com/tx/0xa149f549da1d8582038a6cfb259ff950c7b5af0c2a3c0239b5e0ac99a16dc8e7',
+  contractAddress: '0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA',
+  deployTxHash: '0xb81684597036ca5c4cb8d934d2e59ed3a74e3909626f9db0ada7999cc6b57912',
+  explorerContractUrl: 'https://explorer-studio.genlayer.com/address/0x63a35817137b39E6bb338FcdeaFa882F6c99B8bA',
+  explorerTxUrl: 'https://explorer-studio.genlayer.com/tx/0xb81684597036ca5c4cb8d934d2e59ed3a74e3909626f9db0ada7999cc6b57912',
   flagshipProductId: 'P-000001',
-  createProductTxHash: '0xdd4512a2a0dff28bc0595b0f6aebdf3e0c31009e8ccd7952733e0bb7fb97daaf',
-  fundProductTxHash: '0x4ffe4c5cfeccd7f0c73f4a85295d9d12f84d4b5676629dff7cacc3c0e67bdad8',
+  createProductTxHash: '0x282496da79fc9d41ddb8802822febf0a0749ae749ce7994bd327d7d551c4a6fb',
+  fundProductTxHash: '0x08103a5208789c932c918758ea37160b706beccf1ea6783f0a76aa6c60315efc',
   runnerPin: 'py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6',
 };
 
 export const INITIAL_PRODUCTS = [
   {
     product_id: 'P-000001',
-    insurer: '0x99Ec7a50886C5769Fc45B53c9D7afc40e88923F5',
+    insurer: '0x1E878a57ce79073a3A44640f1C92C362E7e8492d',
     crop: 'Maize (Zea mays)',
     region: 'Federal Capital Territory, Abuja, Nigeria',
     lat: '9.06',
